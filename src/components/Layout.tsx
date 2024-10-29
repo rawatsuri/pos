@@ -11,8 +11,11 @@ import {
   LogOut,
   Bell
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../store/auth';
 import BranchSelector from './BranchSelector';
+import LanguageSwitcher from './LanguageSwitcher';
+import { networkService } from '../services/network';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,15 +25,30 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { logout, user } = useAuthStore();
+  const { t } = useTranslation();
+  const [isOnline, setIsOnline] = React.useState(networkService.isOnline());
+
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    networkService.addListener('online', handleOnline);
+    networkService.addListener('offline', handleOffline);
+
+    return () => {
+      networkService.removeListener('online', handleOnline);
+      networkService.removeListener('offline', handleOffline);
+    };
+  }, []);
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: ShoppingCart, label: 'Orders', path: '/orders' },
-    { icon: Package, label: 'Inventory', path: '/inventory' },
-    { icon: Users, label: 'Customers', path: '/customers' },
-    { icon: UserCircle, label: 'Employees', path: '/employees', roles: ['admin', 'manager'] },
-    { icon: BarChart2, label: 'Analytics', path: '/analytics', roles: ['admin', 'manager'] },
-    { icon: Settings, label: 'Settings', path: '/settings', roles: ['admin'] },
+    { icon: LayoutDashboard, label: t('navigation.dashboard'), path: '/' },
+    { icon: ShoppingCart, label: t('navigation.orders'), path: '/orders' },
+    { icon: Package, label: t('navigation.inventory'), path: '/inventory' },
+    { icon: Users, label: t('navigation.customers'), path: '/customers' },
+    { icon: UserCircle, label: t('navigation.employees'), path: '/employees', roles: ['admin', 'manager'] },
+    { icon: BarChart2, label: t('navigation.analytics'), path: '/analytics', roles: ['admin', 'manager'] },
+    { icon: Settings, label: t('navigation.settings'), path: '/settings', roles: ['admin'] },
   ];
 
   const handleLogout = () => {
@@ -49,7 +67,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="p-6">
-            <h1 className="text-2xl font-bold text-gray-800">RestaurantPOS</h1>
+            <h1 className="text-2xl font-bold text-gray-800">{t('app.name')}</h1>
           </div>
 
           {/* Branch Selector */}
@@ -79,6 +97,21 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             })}
           </nav>
 
+          {/* Language Switcher */}
+          <div className="px-4 py-2 border-t">
+            <LanguageSwitcher />
+          </div>
+
+          {/* Offline Indicator */}
+          {!isOnline && (
+            <div className="px-4 py-2 bg-yellow-50 border-t border-yellow-100">
+              <p className="text-sm text-yellow-800 flex items-center">
+                <span className="w-2 h-2 bg-yellow-400 rounded-full mr-2"></span>
+                {t('status.offline')}
+              </p>
+            </div>
+          )}
+
           {/* Logout */}
           <div className="p-4 border-t">
             <button 
@@ -86,7 +119,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               className="flex items-center w-full px-4 py-3 text-left text-gray-600 hover:bg-gray-50 rounded-lg"
             >
               <LogOut size={20} className="mr-3" />
-              <span className="font-medium">Logout</span>
+              <span className="font-medium">{t('auth.logout')}</span>
             </button>
           </div>
         </div>
@@ -109,7 +142,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-700">{user?.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
+                <p className="text-xs text-gray-500 capitalize">{t(`roles.${user?.role}`)}</p>
               </div>
             </div>
           </div>
