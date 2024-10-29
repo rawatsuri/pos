@@ -9,11 +9,10 @@ import {
   BarChart2, 
   Settings,
   LogOut,
-  ChevronDown,
   Bell
 } from 'lucide-react';
-import { useStore } from '../store';
 import { useAuthStore } from '../store/auth';
+import BranchSelector from './BranchSelector';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,7 +21,6 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { selectedBranch, branches } = useStore();
   const { logout, user } = useAuthStore();
 
   const menuItems = [
@@ -56,10 +54,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Branch Selector */}
           <div className="px-4 mb-6">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm font-medium text-gray-700">{selectedBranch}</span>
-              <ChevronDown size={20} className="text-gray-500" />
-            </div>
+            <BranchSelector />
           </div>
 
           {/* Navigation */}

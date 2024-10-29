@@ -1,5 +1,8 @@
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/auth';
+import { useOrderStore } from '../store/order';
+import { useInventoryStore } from '../store/inventory';
+import toast from 'react-hot-toast';
 
 class SocketService {
   private static instance: SocketService;
@@ -36,37 +39,52 @@ class SocketService {
 
     this.socket.on('connect', () => {
       console.log('Connected to WebSocket server');
+      toast.success('Real-time connection established');
     });
 
     this.socket.on('connect_error', (error) => {
       console.error('WebSocket connection error:', error);
+      toast.error('Connection error. Retrying...');
     });
 
     this.socket.on('disconnect', (reason) => {
       console.log('Disconnected from WebSocket server:', reason);
+      toast.error('Connection lost. Reconnecting...');
     });
 
     // Real-time order updates
     this.socket.on('order:updated', (data) => {
-      // Handle order updates
+      const { updateOrderInRealtime } = useOrderStore.getState();
+      updateOrderInRealtime(data);
+      toast.success(`Order #${data.orderId} status updated to ${data.status}`);
     });
 
     // Real-time inventory updates
     this.socket.on('inventory:updated', (data) => {
-      // Handle inventory updates
+      const { updateStockInRealtime } = useInventoryStore.getState();
+      updateStockInRealtime(data);
+      if (data.stock <= data.minStock) {
+        toast.warning(`Low stock alert: ${data.name}`);
+      }
     });
 
     // Kitchen display system updates
     this.socket.on('kds:updated', (data) => {
-      // Handle KDS updates
+      const { updateOrderInRealtime } = useOrderStore.getState();
+      updateOrderInRealtime(data);
     });
-  }
 
-  disconnect() {
-    if (this.socket) {
-      this.socket.disconnect();
-      this.socket = null;
-    }
+    // Payment status updates
+    this.socket.on('payment:updated', (data) => {
+      const { updateOrderInRealtime } = useOrderStore.getState();
+      updateOrderInRealtime(data);
+      toast.success(`Payment received for Order #${data.orderId}`);
+    });
+
+    // Branch switch updates
+    this.socket.on('branch:switched', (data) => {
+      toast.success(`Connected to ${data.branchName}`);
+    });
   }
 
   // Branch management
@@ -77,23 +95,47 @@ class SocketService {
   }
 
   // Order management
-  updateOrderStatus(data: { orderId: string; status: string; branchId: string }) {
+  emitOrderUpdate(data: { 
+    orderId: string; 
+    status: string; 
+    branchId: string;
+    items?: any[];
+    total?: number;
+  }) {
     if (this.socket) {
       this.socket.emit('order:update', data);
     }
   }
 
   // Inventory management
-  updateInventory(data: { productId: string; stock: number; branchId: string }) {
+  emitInventoryUpdate(data: { 
+    productId: string; 
+    stock: number; 
+    branchId: string;
+    minStock: number;
+    name: string;
+  }) {
     if (this.socket) {
       this.socket.emit('inventory:update', data);
     }
   }
 
-  // Kitchen display system
-  updateKDS(data: { orderId: string; status: string; branchId: string }) {
+  // Payment processing
+  emitPaymentUpdate(data: {
+    orderId: string;
+    amount: number;
+    method: string;
+    status: 'completed' | 'failed' | 'pending';
+  }) {
     if (this.socket) {
-      this.socket.emit('kds:update', data);
+      this.socket.emit('payment:update', data);
+    }
+  }
+
+  disconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
     }
   }
 }

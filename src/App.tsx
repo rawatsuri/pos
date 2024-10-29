@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
@@ -13,9 +13,19 @@ import Employees from './pages/Employees';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
 import { useAuthStore } from './store/auth';
+import { useBranchStore } from './store/branch';
+import { socketService } from './services/socket';
 
 function App() {
   const { token } = useAuthStore();
+  const { fetchBranches } = useBranchStore();
+
+  useEffect(() => {
+    if (token) {
+      socketService.connect();
+      fetchBranches();
+    }
+  }, [token, fetchBranches]);
 
   return (
     <BrowserRouter>
