@@ -4,6 +4,7 @@ import { Toaster } from 'react-hot-toast';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Orders from './pages/Orders';
 import Inventory from './pages/Inventory';
@@ -22,6 +23,10 @@ function App() {
       <Routes>
         <Route path="/login" element={
           token ? <Navigate to="/" replace /> : <Login />
+        } />
+        
+        <Route path="/signup" element={
+          token ? <Navigate to="/" replace /> : <Signup />
         } />
         
         <Route path="/" element={

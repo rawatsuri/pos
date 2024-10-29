@@ -1,10 +1,10 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuthStore } from '../store/auth';
-import { Loader2, Coffee } from 'lucide-react';
+import { Loader2, Coffee, UserPlus } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const loginSchema = z.object({
@@ -17,6 +17,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 const Login = () => {
   const navigate = useNavigate();
   const { login, isLoading, error, clearError } = useAuthStore();
+  const [showSignup, setShowSignup] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema)
   });
@@ -29,8 +30,12 @@ const Login = () => {
   }, [error, clearError]);
 
   const onSubmit = async (data: LoginFormData) => {
-    await login(data);
-    navigate('/');
+    try {
+      await login(data);
+      navigate('/');
+    } catch (err) {
+      toast.error('Login failed. Please check your credentials.');
+    }
   };
 
   const handleDemoLogin = async (role: 'admin' | 'manager' | 'staff') => {
@@ -40,8 +45,12 @@ const Login = () => {
       staff: { email: 'staff@demo.com', password: 'demo123' }
     };
 
-    await login(demoCredentials[role]);
-    navigate('/');
+    try {
+      await login(demoCredentials[role]);
+      navigate('/');
+    } catch (err) {
+      toast.error('Demo login failed. Please try again.');
+    }
   };
 
   return (
@@ -139,14 +148,26 @@ const Login = () => {
               </button>
             </div>
           </div>
-        </div>
 
-        <div className="mt-4 text-center text-sm text-gray-600">
-          <p>Demo Account Credentials:</p>
-          <div className="mt-2 space-y-1">
-            <p>Admin: admin@demo.com / demo123</p>
-            <p>Manager: manager@demo.com / demo123</p>
-            <p>Staff: staff@demo.com / demo123</p>
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Or</span>
+              </div>
+            </div>
+
+            <div className="mt-6">
+              <Link
+                to="/signup"
+                className="w-full flex justify-center items-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                <UserPlus size={20} className="mr-2" />
+                Create new account
+              </Link>
+            </div>
           </div>
         </div>
       </div>

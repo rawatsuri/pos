@@ -13,6 +13,7 @@ import {
   Bell
 } from 'lucide-react';
 import { useStore } from '../store';
+import { useAuthStore } from '../store/auth';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -22,16 +23,26 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { selectedBranch, branches } = useStore();
+  const { logout, user } = useAuthStore();
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
     { icon: ShoppingCart, label: 'Orders', path: '/orders' },
     { icon: Package, label: 'Inventory', path: '/inventory' },
     { icon: Users, label: 'Customers', path: '/customers' },
-    { icon: UserCircle, label: 'Employees', path: '/employees' },
-    { icon: BarChart2, label: 'Analytics', path: '/analytics' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
+    { icon: UserCircle, label: 'Employees', path: '/employees', roles: ['admin', 'manager'] },
+    { icon: BarChart2, label: 'Analytics', path: '/analytics', roles: ['admin', 'manager'] },
+    { icon: Settings, label: 'Settings', path: '/settings', roles: ['admin'] },
   ];
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const filteredMenuItems = menuItems.filter(item => 
+    !item.roles || (user && item.roles.includes(user.role))
+  );
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -53,7 +64,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Navigation */}
           <nav className="flex-1 px-4">
-            {menuItems.map((item) => {
+            {filteredMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
               return (
@@ -75,7 +86,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
           {/* Logout */}
           <div className="p-4 border-t">
-            <button className="flex items-center w-full px-4 py-3 text-left text-gray-600 hover:bg-gray-50 rounded-lg">
+            <button 
+              onClick={handleLogout}
+              className="flex items-center w-full px-4 py-3 text-left text-gray-600 hover:bg-gray-50 rounded-lg"
+            >
               <LogOut size={20} className="mr-3" />
               <span className="font-medium">Logout</span>
             </button>
@@ -93,14 +107,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
             </button>
             <div className="ml-4 flex items-center">
-              <img
-                src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80"
-                alt="User"
-                className="w-8 h-8 rounded-full"
-              />
+              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                <span className="text-sm font-medium text-blue-600">
+                  {user?.name?.charAt(0).toUpperCase()}
+                </span>
+              </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-gray-700">John Doe</p>
-                <p className="text-xs text-gray-500">Admin</p>
+                <p className="text-sm font-medium text-gray-700">{user?.name}</p>
+                <p className="text-xs text-gray-500 capitalize">{user?.role}</p>
               </div>
             </div>
           </div>
