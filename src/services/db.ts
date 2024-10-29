@@ -1,13 +1,20 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Order } from '../store/order';
-import { Customer } from '../store/customer';
-import { Product } from '../store/inventory';
-import { Employee } from '../store/employee';
 
 interface AppDB extends DBSchema {
   orders: {
     key: string;
-    value: Order & {
+    value: {
+      id: string;
+      items: Array<{
+        productId: string;
+        name: string;
+        quantity: number;
+        price: number;
+      }>;
+      total: number;
+      status: string;
+      tableNumber: string;
+      createdAt: string;
       syncStatus: 'pending' | 'synced' | 'failed';
       lastModified: number;
     };
@@ -15,7 +22,13 @@ interface AppDB extends DBSchema {
   };
   customers: {
     key: string;
-    value: Customer & {
+    value: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      address?: string;
+      loyaltyPoints: number;
       syncStatus: 'pending' | 'synced' | 'failed';
       lastModified: number;
     };
@@ -23,7 +36,15 @@ interface AppDB extends DBSchema {
   };
   products: {
     key: string;
-    value: Product & {
+    value: {
+      id: string;
+      name: string;
+      description: string;
+      category: string;
+      price: number;
+      stock: number;
+      unit: string;
+      minStock: number;
       syncStatus: 'pending' | 'synced' | 'failed';
       lastModified: number;
     };
@@ -31,7 +52,14 @@ interface AppDB extends DBSchema {
   };
   employees: {
     key: string;
-    value: Employee & {
+    value: {
+      id: string;
+      name: string;
+      email: string;
+      phone: string;
+      role: string;
+      status: string;
+      joinDate: string;
       syncStatus: 'pending' | 'synced' | 'failed';
       lastModified: number;
     };
@@ -82,11 +110,7 @@ class LocalDatabase {
     item: AppDB[T]['value']
   ): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
-    await this.db.put(storeName, {
-      ...item,
-      syncStatus: 'pending',
-      lastModified: Date.now(),
-    });
+    await this.db.put(storeName, item);
   }
 
   async getItem<T extends keyof AppDB>(
@@ -130,6 +154,11 @@ class LocalDatabase {
   ): Promise<void> {
     if (!this.db) throw new Error('Database not initialized');
     await this.db.delete(storeName, id);
+  }
+
+  async clearStore<T extends keyof AppDB>(storeName: T): Promise<void> {
+    if (!this.db) throw new Error('Database not initialized');
+    await this.db.clear(storeName);
   }
 }
 

@@ -7,6 +7,7 @@ class SyncService {
   private static instance: SyncService;
   private syncInProgress = false;
   private syncInterval: number | null = null;
+  private pendingSync: Set<string> = new Set();
 
   private constructor() {}
 
@@ -18,28 +19,27 @@ class SyncService {
   }
 
   async initialize(): Promise<void> {
-    // Initialize local database
     await localDB.initialize();
 
-    // Start periodic sync if online
     if (networkService.isOnline()) {
       this.startPeriodicSync();
     }
 
-    // Listen for online/offline events
     networkService.addListener('online', () => {
+      toast.success('Back online! Syncing data...');
       this.startPeriodicSync();
-      this.syncAll(); // Immediate sync when coming online
+      this.syncAll();
     });
 
     networkService.addListener('offline', () => {
+      toast.warning('You are offline. Changes will sync when connection is restored.');
       this.stopPeriodicSync();
     });
   }
 
   private startPeriodicSync(): void {
     if (this.syncInterval) return;
-    this.syncInterval = window.setInterval(() => this.syncAll(), 5 * 60 * 1000); // Sync every 5 minutes
+    this.syncInterval = window.setInterval(() => this.syncAll(), 5 * 60 * 1000);
   }
 
   private stopPeriodicSync(): void {
@@ -54,15 +54,16 @@ class SyncService {
 
     try {
       this.syncInProgress = true;
-      await Promise.all([
-        this.syncStore('orders'),
-        this.syncStore('customers'),
-        this.syncStore('products'),
-        this.syncStore('employees')
-      ]);
+      const stores = ['orders', 'customers', 'products', 'employees'] as const;
+      
+      for (const store of stores) {
+        if (this.pendingSync.has(store)) {
+          await this.syncStore(store);
+          this.pendingSync.delete(store);
+        }
+      }
     } catch (error) {
       console.error('Sync failed:', error);
-      toast.error('Failed to sync data with server');
     } finally {
       this.syncInProgress = false;
     }
@@ -73,25 +74,72 @@ class SyncService {
     
     for (const item of pendingItems) {
       try {
-        await api.post(`/sync/${storeName}`, {
+        const response = await api.post(`/sync/${storeName}`, {
           data: item,
           lastModified: item.lastModified
         });
-        await localDB.updateSyncStatus(storeName, item.id, 'synced');
+
+        if (response.status === 200) {
+          await localDB.updateSyncStatus(storeName, item.id, 'synced');
+        } else {
+          await localDB.updateSyncStatus(storeName, item.id, 'failed');
+        }
       } catch (error) {
         await localDB.updateSyncStatus(storeName, item.id, 'failed');
       }
     }
   }
 
-  async syncItem(storeName: 'orders' | 'customers' | 'products' | 'employees', item: any): Promise<void> {
-    await localDB.addItem(storeName, item);
+  async addItem<T extends 'orders' | 'customers' | 'products' | 'employees'>(
+    storeName: T,
+    item: any
+  ): Promise<void> {
+    await localDB.addItem(storeName, {
+      ...item,
+      syncStatus: 'pending',
+      lastModified: Date.now()
+    });
+
+    this.pendingSync.add(storeName);
+
+    if (networkService.isOnline()) {
+      this.syncStore(storeName).catch(console.error);
+    }
+  }
+
+  async updateItem<T extends 'orders' | 'customers' | 'products' | 'employees'>(
+    storeName: T,
+    id: string,
+    updates: any
+  ): Promise<void> {
+    const item = await localDB.getItem(storeName, id);
+    if (item) {
+      await localDB.addItem(storeName, {
+        ...item,
+        ...updates,
+        syncStatus: 'pending',
+        lastModified: Date.now()
+      });
+
+      this.pendingSync.add(storeName);
+
+      if (networkService.isOnline()) {
+        this.syncStore(storeName).catch(console.error);
+      }
+    }
+  }
+
+  async deleteItem<T extends 'orders' | 'customers' | 'products' | 'employees'>(
+    storeName: T,
+    id: string
+  ): Promise<void> {
+    await localDB.deleteItem(storeName, id);
     
     if (networkService.isOnline()) {
       try {
-        await this.syncStore(storeName);
+        await api.delete(`/${storeName}/${id}`);
       } catch (error) {
-        console.error(`Failed to sync ${storeName}:`, error);
+        console.error(`Failed to delete ${storeName} item:`, error);
       }
     }
   }

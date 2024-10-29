@@ -1,6 +1,9 @@
 import { create } from 'zustand';
 import { toast } from 'react-hot-toast';
-import { socketService } from '../services/socket';
+import { syncService } from '../services/sync';
+import { localDB } from '../services/db';
+import { networkService } from '../services/network';
+import api from '../services/api';
 
 export interface OrderItem {
   productId: string;
@@ -42,39 +45,53 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
   fetchOrders: async () => {
     try {
-      set({ isLoading: true });
-      const response = await fetch('/api/orders');
-      const data = await response.json();
-      set({ orders: data, isLoading: false });
+      set({ isLoading: true, error: null });
+      
+      // First, get local data
+      const localOrders = await localDB.getAllItems('orders');
+      set({ orders: localOrders as Order[] });
+
+      // If online, fetch from server and update local
+      if (networkService.isOnline()) {
+        const response = await api.get('/orders');
+        const serverOrders = response.data;
+        
+        // Update local database
+        await Promise.all(
+          serverOrders.map(order => 
+            localDB.addItem('orders', { ...order, syncStatus: 'synced', lastModified: Date.now() })
+          )
+        );
+
+        set({ orders: serverOrders });
+      }
     } catch (error) {
-      set({ error: 'Failed to fetch orders', isLoading: false });
-      toast.error('Failed to fetch orders');
+      console.error('Error fetching orders:', error);
+      // Don't show error toast if we have local data
+      if (get().orders.length === 0) {
+        toast.error('Failed to fetch orders');
+      }
+    } finally {
+      set({ isLoading: false });
     }
   },
 
   createNewOrder: async (orderData) => {
     try {
       set({ isLoading: true });
-      const response = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(orderData)
-      });
-      const newOrder = await response.json();
+      const newOrder: Order = {
+        ...orderData,
+        id: `order-${Date.now()}`,
+        createdAt: new Date().toISOString()
+      };
+
+      // Always save to local first
+      await syncService.addItem('orders', newOrder);
       
       set((state) => ({
         orders: [newOrder, ...state.orders],
         isLoading: false
       }));
-
-      // Emit socket event for real-time updates
-      socketService.emitOrderUpdate({
-        orderId: newOrder.id,
-        status: newOrder.status,
-        branchId: newOrder.branchId,
-        items: newOrder.items,
-        total: newOrder.total
-      });
 
       toast.success('Order created successfully');
     } catch (error) {
@@ -86,26 +103,16 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   updateStatus: async (orderId, status) => {
     try {
       set({ isLoading: true });
-      const response = await fetch(`/api/orders/${orderId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      });
-      const updatedOrder = await response.json();
-
+      
+      // Update local first
+      await syncService.updateItem('orders', orderId, { status });
+      
       set((state) => ({
         orders: state.orders.map((order) =>
           order.id === orderId ? { ...order, status } : order
         ),
         isLoading: false
       }));
-
-      // Emit socket event for real-time updates
-      socketService.emitOrderUpdate({
-        orderId,
-        status,
-        branchId: updatedOrder.branchId
-      });
 
       toast.success(`Order status updated to ${status}`);
     } catch (error) {
@@ -125,12 +132,12 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   processPayment: async (orderId, method) => {
     try {
       set({ isLoading: true });
-      const response = await fetch(`/api/orders/${orderId}/payment`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method })
+      
+      // Update local first
+      await syncService.updateItem('orders', orderId, {
+        paymentStatus: 'completed',
+        paymentMethod: method
       });
-      const updatedOrder = await response.json();
 
       set((state) => ({
         orders: state.orders.map((order) =>
@@ -138,14 +145,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         ),
         isLoading: false
       }));
-
-      // Emit socket event for real-time payment update
-      socketService.emitPaymentUpdate({
-        orderId,
-        amount: updatedOrder.total,
-        method,
-        status: 'completed'
-      });
 
       toast.success('Payment processed successfully');
     } catch (error) {
