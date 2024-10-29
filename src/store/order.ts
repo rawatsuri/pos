@@ -32,23 +32,6 @@ export interface Order {
   syncStatus?: 'pending' | 'synced' | 'failed';
 }
 
-interface OrderState {
-  orders: Order[];
-  activeOrder: Order | null;
-  isLoading: boolean;
-  error: string | null;
-  fetchOrders: () => Promise<void>;
-  createNewOrder: (orderData: Omit<Order, 'id' | 'createdAt'>) => Promise<void>;
-  updateStatus: (orderId: string, status: Order['status']) => Promise<void>;
-  updateOrderInRealtime: (data: Partial<Order> & { orderId: string }) => void;
-  processPayment: (orderId: string, paymentData: {
-    cashAmount: number;
-    onlineAmount: number;
-    customerPhone: string;
-  }) => Promise<void>;
-  setActiveOrder: (order: Order | null) => void;
-}
-
 // Demo orders for offline functionality
 const demoOrders: Order[] = [
   {
@@ -97,17 +80,25 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
       // If online, fetch from server and update local
       if (networkService.isOnline()) {
-        const response = await api.get('/orders');
-        const serverOrders = response.data;
-        
-        // Update local database
-        await Promise.all(
-          serverOrders.map(order => 
-            localDB.addItem('orders', { ...order, syncStatus: 'synced', lastModified: Date.now() })
-          )
-        );
+        try {
+          const response = await api.get('/orders');
+          const serverOrders = response.data;
+          
+          // Update local database
+          await Promise.all(
+            serverOrders.map(order => 
+              localDB.addItem('orders', { ...order, syncStatus: 'synced', lastModified: Date.now() })
+            )
+          );
 
-        set({ orders: serverOrders });
+          set({ orders: serverOrders });
+        } catch (error) {
+          // Handle API error gracefully
+          console.info('Using local/demo data due to API error');
+          if (localOrders.length === 0) {
+            set({ orders: demoOrders });
+          }
+        }
       } else {
         // If offline, use demo data if no local data
         if (localOrders.length === 0) {
@@ -115,8 +106,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         }
       }
     } catch (error) {
-      console.error('Error fetching orders:', error);
-      // Use demo data if fetch fails
+      // Handle any other errors without trying to clone error object
+      console.error('Error fetching orders');
       set({ 
         orders: demoOrders,
         error: 'Failed to fetch orders. Using offline data.'
@@ -126,6 +117,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
   },
 
+  // Rest of the store implementation remains the same
   createNewOrder: async (orderData) => {
     try {
       set({ isLoading: true });
@@ -136,7 +128,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         syncStatus: 'pending'
       };
 
-      // Always save to local first
       await syncService.addItem('orders', newOrder);
       
       set((state) => ({
@@ -144,7 +135,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         isLoading: false
       }));
 
-      // If it's an online payment, generate and send bill
       if (orderData.paymentMethod === 'online' || orderData.paymentMethod === 'partial') {
         const bill = await billingService.generateBill(newOrder);
         await billingService.sendBill(bill, {
@@ -181,10 +171,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         customerPhone
       };
 
-      // Update local first
       await syncService.updateItem('orders', orderId, updatedOrder);
       
-      // Generate and send bill for online portion
       if (onlineAmount > 0) {
         const bill = await billingService.generateBill(updatedOrder);
         await billingService.sendBill(bill, {
@@ -212,7 +200,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     try {
       set({ isLoading: true });
       
-      // Update local first
       await syncService.updateItem('orders', orderId, { status });
       
       set((state) => ({

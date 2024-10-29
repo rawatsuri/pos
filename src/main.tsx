@@ -10,8 +10,10 @@ import { syncService } from './services/sync';
 // Initialize sync service
 syncService.initialize().catch(console.error);
 
-// Register service worker
-if ('serviceWorker' in navigator) {
+// Only register service worker in production and not in StackBlitz
+if ('serviceWorker' in navigator && 
+    !window.location.host.includes('stackblitz.io') && 
+    import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(console.error);
   });

@@ -4,6 +4,7 @@ import { ShoppingCart, Plus, Minus } from 'lucide-react';
 import { useInventoryStore } from '../store/inventory';
 import { useOrderStore } from '../store/order';
 import { useBranchStore } from '../store/branch';
+import toast from 'react-hot-toast';
 
 const CustomerMenu = () => {
   const { branchId, tableNumber } = useParams();
@@ -58,8 +59,8 @@ const CustomerMenu = () => {
         items: orderItems,
         total,
         status: 'pending',
-        tableNumber,
-        branchId,
+        tableNumber: tableNumber!,
+        branchId: branchId!,
         customerPhone,
         paymentMethod,
         paymentStatus: paymentMethod === 'cash' ? 'pending' : 'processing'
@@ -67,16 +68,25 @@ const CustomerMenu = () => {
 
       toast.success('Order placed successfully!');
       setCart({});
+      setCustomerPhone('');
     } catch (error) {
       toast.error('Failed to place order');
     }
   };
 
+  if (!branch) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-500">Invalid branch or table</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-2xl font-bold">{branch?.name}</h1>
+          <h1 className="text-2xl font-bold">{branch.name}</h1>
           <p className="text-gray-600">Table {tableNumber}</p>
         </div>
       </div>
@@ -159,7 +169,7 @@ const CustomerMenu = () => {
 
               <div className="mt-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number
+                  Phone Number (for order updates)
                 </label>
                 <input
                   type="tel"

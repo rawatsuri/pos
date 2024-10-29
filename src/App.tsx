@@ -12,6 +12,7 @@ import Customers from './pages/Customers';
 import Employees from './pages/Employees';
 import Analytics from './pages/Analytics';
 import Settings from './pages/Settings';
+import CustomerMenu from './pages/CustomerMenu';
 import ErrorBoundary from './components/ErrorBoundary';
 import { useAuthStore } from './store/auth';
 import { useBranchStore } from './store/branch';
@@ -63,6 +64,8 @@ function App() {
           <Route path="/signup" element={
             token ? <Navigate to="/" replace /> : <Signup />
           } />
+          
+          <Route path="/menu/:branchId/:tableNumber" element={<CustomerMenu />} />
           
           <Route path="/" element={
             <ProtectedRoute>

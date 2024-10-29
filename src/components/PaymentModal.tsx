@@ -4,22 +4,27 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X, DollarSign } from 'lucide-react';
 import { Order } from '../store/order';
+import toast from 'react-hot-toast';
 
 const paymentSchema = z.object({
   cashAmount: z.number().min(0),
   onlineAmount: z.number().min(0),
   customerPhone: z.string().min(10, 'Invalid phone number')
+}).refine(data => data.cashAmount + data.onlineAmount > 0, {
+  message: "Total payment amount must be greater than 0"
 });
+
+type PaymentFormData = z.infer<typeof paymentSchema>;
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   order: Order;
-  onSubmit: (data: z.infer<typeof paymentSchema>) => Promise<void>;
+  onSubmit: (data: PaymentFormData) => Promise<void>;
 }
 
 const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, order, onSubmit }) => {
-  const { register, handleSubmit, watch, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<PaymentFormData>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
       cashAmount: 0,
@@ -31,6 +36,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, order, onS
   const cashAmount = watch('cashAmount');
   const onlineAmount = watch('onlineAmount');
   const remaining = order.total - (cashAmount + onlineAmount);
+
+  const handleFormSubmit = async (data: PaymentFormData) => {
+    if (remaining !== 0) {
+      toast.error('Total payment must equal order amount');
+      return;
+    }
+    await onSubmit(data);
+  };
 
   if (!isOpen) return null;
 
@@ -45,7 +58,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, order, onS
             </button>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700">
                 Total Amount

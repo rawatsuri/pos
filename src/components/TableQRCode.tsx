@@ -1,20 +1,21 @@
 import React from 'react';
-import QRCode from 'qrcode.js';
+import QRCode from 'qrcode';
 import { Download, Copy } from 'lucide-react';
 import { useBranchStore } from '../store/branch';
+import toast from 'react-hot-toast';
 
 interface TableQRCodeProps {
   tableNumber: string;
 }
 
 const TableQRCode: React.FC<TableQRCodeProps> = ({ tableNumber }) => {
-  const qrRef = React.useRef<HTMLDivElement>(null);
+  const qrRef = React.useRef<HTMLCanvasElement>(null);
   const { selectedBranch } = useBranchStore();
 
   React.useEffect(() => {
-    if (qrRef.current) {
-      const orderUrl = `${window.location.origin}/menu/${selectedBranch?.id}/${tableNumber}`;
-      QRCode.toCanvas(qrRef.current, orderUrl, {
+    if (qrRef.current && selectedBranch) {
+      const menuUrl = `${window.location.origin}/menu/${selectedBranch.id}/${tableNumber}`;
+      QRCode.toCanvas(qrRef.current, menuUrl, {
         width: 200,
         margin: 2,
         color: {
@@ -26,9 +27,8 @@ const TableQRCode: React.FC<TableQRCodeProps> = ({ tableNumber }) => {
   }, [tableNumber, selectedBranch]);
 
   const handleDownload = () => {
-    const canvas = qrRef.current?.querySelector('canvas');
-    if (canvas) {
-      const url = canvas.toDataURL('image/png');
+    if (qrRef.current) {
+      const url = qrRef.current.toDataURL('image/png');
       const link = document.createElement('a');
       link.download = `table-${tableNumber}-qr.png`;
       link.href = url;
@@ -37,22 +37,24 @@ const TableQRCode: React.FC<TableQRCodeProps> = ({ tableNumber }) => {
   };
 
   const handleCopyUrl = () => {
-    const url = `${window.location.origin}/menu/${selectedBranch?.id}/${tableNumber}`;
-    navigator.clipboard.writeText(url);
-    toast.success('Menu URL copied to clipboard');
+    if (selectedBranch) {
+      const url = `${window.location.origin}/menu/${selectedBranch.id}/${tableNumber}`;
+      navigator.clipboard.writeText(url);
+      toast.success('Menu URL copied to clipboard');
+    }
   };
 
   return (
-    <div className="flex flex-col items-center p-4 bg-white rounded-lg shadow-sm">
+    <div className="flex flex-col items-center p-6 bg-white rounded-lg shadow-sm">
       <h3 className="text-lg font-medium mb-4">Table {tableNumber} QR Code</h3>
-      <div ref={qrRef} className="mb-4"></div>
+      <canvas ref={qrRef} className="mb-4" />
       <div className="flex gap-2">
         <button
           onClick={handleDownload}
           className="flex items-center px-3 py-2 text-sm bg-blue-50 text-blue-600 rounded-md hover:bg-blue-100"
         >
           <Download size={16} className="mr-2" />
-          Download
+          Download QR Code
         </button>
         <button
           onClick={handleCopyUrl}
