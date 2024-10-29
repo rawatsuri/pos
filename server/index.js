@@ -15,6 +15,7 @@ import employeeRoutes from './routes/employee.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { rateLimiter } from './middleware/rateLimiter.middleware.js';
 import { setupWebSocket } from './websocket.js';
+import { seedDemoUsers } from './seeders/demo.js';
 
 dotenv.config();
 
@@ -64,6 +65,9 @@ const connectDB = async (retries = 5) => {
       serverSelectionTimeoutMS: 5000,
     });
     console.log('Connected to MongoDB');
+    
+    // Seed demo users after successful connection
+    await seedDemoUsers();
   } catch (err) {
     if (retries > 0) {
       console.log(`Retrying database connection... (${retries} attempts remaining)`);

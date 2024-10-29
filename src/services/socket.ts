@@ -28,8 +28,14 @@ class SocketService {
       reconnectionAttempts: 5
     });
 
+    this.setupEventListeners();
+  }
+
+  private setupEventListeners() {
+    if (!this.socket) return;
+
     this.socket.on('connect', () => {
-      console.log('Connected to WebSocket');
+      console.log('Connected to WebSocket server');
     });
 
     this.socket.on('connect_error', (error) => {
@@ -37,7 +43,22 @@ class SocketService {
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Disconnected from WebSocket:', reason);
+      console.log('Disconnected from WebSocket server:', reason);
+    });
+
+    // Real-time order updates
+    this.socket.on('order:updated', (data) => {
+      // Handle order updates
+    });
+
+    // Real-time inventory updates
+    this.socket.on('inventory:updated', (data) => {
+      // Handle inventory updates
+    });
+
+    // Kitchen display system updates
+    this.socket.on('kds:updated', (data) => {
+      // Handle KDS updates
     });
   }
 
@@ -48,33 +69,31 @@ class SocketService {
     }
   }
 
+  // Branch management
   joinBranch(branchId: string) {
     if (this.socket) {
       this.socket.emit('join-branch', branchId);
     }
   }
 
-  onOrderUpdate(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('order:updated', callback);
-    }
-  }
-
-  onInventoryUpdate(callback: (data: any) => void) {
-    if (this.socket) {
-      this.socket.on('inventory:updated', callback);
-    }
-  }
-
+  // Order management
   updateOrderStatus(data: { orderId: string; status: string; branchId: string }) {
     if (this.socket) {
       this.socket.emit('order:update', data);
     }
   }
 
+  // Inventory management
   updateInventory(data: { productId: string; stock: number; branchId: string }) {
     if (this.socket) {
       this.socket.emit('inventory:update', data);
+    }
+  }
+
+  // Kitchen display system
+  updateKDS(data: { orderId: string; status: string; branchId: string }) {
+    if (this.socket) {
+      this.socket.emit('kds:update', data);
     }
   }
 }
