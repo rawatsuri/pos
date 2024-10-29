@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { login as apiLogin, register as apiRegister } from '../api';
 
 interface User {
   id: string;
@@ -20,6 +19,31 @@ interface AuthState {
   clearError: () => void;
 }
 
+// Demo users for local testing
+const demoUsers = {
+  'admin@demo.com': {
+    id: 'admin-1',
+    name: 'Demo Admin',
+    email: 'admin@demo.com',
+    password: 'demo123',
+    role: 'admin' as const
+  },
+  'manager@demo.com': {
+    id: 'manager-1',
+    name: 'Demo Manager',
+    email: 'manager@demo.com',
+    password: 'demo123',
+    role: 'manager' as const
+  },
+  'staff@demo.com': {
+    id: 'staff-1',
+    name: 'Demo Staff',
+    email: 'staff@demo.com',
+    password: 'demo123',
+    role: 'staff' as const
+  }
+};
+
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -31,26 +55,50 @@ export const useAuthStore = create<AuthState>()(
       login: async (credentials) => {
         try {
           set({ isLoading: true, error: null });
-          const { data } = await apiLogin(credentials);
-          set({ user: data.user, token: data.token, isLoading: false });
+          
+          // Check demo users
+          const demoUser = demoUsers[credentials.email];
+          if (demoUser && demoUser.password === credentials.password) {
+            const { password, ...user } = demoUser;
+            set({ 
+              user,
+              token: 'demo-token',
+              isLoading: false 
+            });
+            return;
+          }
+
+          throw new Error('Invalid credentials');
         } catch (error) {
           set({ 
-            error: error.response?.data?.message || 'Failed to login', 
+            error: error instanceof Error ? error.message : 'Failed to login', 
             isLoading: false 
           });
+          throw error;
         }
       },
 
       register: async (userData) => {
         try {
           set({ isLoading: true, error: null });
-          const { data } = await apiRegister(userData);
-          set({ user: data.user, token: data.token, isLoading: false });
-        } catch (error) {
+          // In a real app, this would make an API call
+          const newUser = {
+            id: `user-${Date.now()}`,
+            name: userData.name,
+            email: userData.email,
+            role: userData.role as 'admin' | 'manager' | 'staff'
+          };
           set({ 
-            error: error.response?.data?.message || 'Failed to register', 
+            user: newUser,
+            token: 'demo-token',
             isLoading: false 
           });
+        } catch (error) {
+          set({ 
+            error: error instanceof Error ? error.message : 'Failed to register', 
+            isLoading: false 
+          });
+          throw error;
         }
       },
 

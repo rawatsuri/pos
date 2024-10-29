@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { addProduct, getInventory, updateProduct, deleteProduct, updateStock } from '../api';
 import { toast } from 'react-hot-toast';
 
 export interface Product {
@@ -14,6 +13,40 @@ export interface Product {
   image?: string;
 }
 
+// Mock data for demo
+const mockProducts: Product[] = [
+  {
+    id: 'p1',
+    name: 'Margherita Pizza',
+    description: 'Classic tomato and mozzarella pizza',
+    category: 'Main Course',
+    price: 12.99,
+    stock: 50,
+    unit: 'pcs',
+    minStock: 10
+  },
+  {
+    id: 'p2',
+    name: 'Coca Cola',
+    description: '330ml can',
+    category: 'Beverages',
+    price: 2.50,
+    stock: 100,
+    unit: 'pcs',
+    minStock: 20
+  },
+  {
+    id: 'p3',
+    name: 'Chicken Burger',
+    description: 'Grilled chicken breast with lettuce and mayo',
+    category: 'Main Course',
+    price: 8.99,
+    stock: 30,
+    unit: 'pcs',
+    minStock: 5
+  }
+];
+
 interface InventoryState {
   products: Product[];
   isLoading: boolean;
@@ -25,16 +58,17 @@ interface InventoryState {
   updateStock: (id: string, quantity: number) => Promise<void>;
 }
 
-export const useInventoryStore = create<InventoryState>((set, get) => ({
-  products: [],
+export const useInventoryStore = create<InventoryState>((set) => ({
+  products: mockProducts,
   isLoading: false,
   error: null,
 
   fetchProducts: async () => {
     try {
       set({ isLoading: true });
-      const { data } = await getInventory();
-      set({ products: data, isLoading: false });
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      set({ products: mockProducts, isLoading: false });
     } catch (error) {
       set({ error: 'Failed to fetch products', isLoading: false });
       toast.error('Failed to fetch products');
@@ -44,9 +78,14 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   addProduct: async (productData) => {
     try {
       set({ isLoading: true });
-      const { data } = await addProduct(productData);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const newProduct = {
+        id: `p${Date.now()}`,
+        ...productData
+      };
       set((state) => ({
-        products: [...state.products, data],
+        products: [...state.products, newProduct],
         isLoading: false
       }));
       toast.success('Product added successfully');
@@ -59,10 +98,11 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   updateProduct: async (id, productData) => {
     try {
       set({ isLoading: true });
-      const { data } = await updateProduct(id, productData);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       set((state) => ({
         products: state.products.map((product) =>
-          product.id === id ? { ...product, ...data } : product
+          product.id === id ? { ...product, ...productData } : product
         ),
         isLoading: false
       }));
@@ -76,7 +116,8 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   deleteProduct: async (id) => {
     try {
       set({ isLoading: true });
-      await deleteProduct(id);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       set((state) => ({
         products: state.products.filter((product) => product.id !== id),
         isLoading: false
@@ -91,10 +132,11 @@ export const useInventoryStore = create<InventoryState>((set, get) => ({
   updateStock: async (id, quantity) => {
     try {
       set({ isLoading: true });
-      const { data } = await updateStock(id, quantity);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       set((state) => ({
         products: state.products.map((product) =>
-          product.id === id ? { ...product, stock: data.stock } : product
+          product.id === id ? { ...product, stock: quantity } : product
         ),
         isLoading: false
       }));

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { getCustomers, addCustomer, updateCustomer, deleteCustomer } from '../api';
 import { toast } from 'react-hot-toast';
 
 export interface Customer {
@@ -10,9 +9,33 @@ export interface Customer {
   address?: string;
   orders: number;
   totalSpent: number;
-  lastOrder: Date;
+  lastOrder: string;
   loyaltyPoints: number;
 }
+
+// Mock data for demo
+const mockCustomers: Customer[] = [
+  {
+    id: 'c1',
+    name: 'John Smith',
+    email: 'john.smith@email.com',
+    phone: '+1 234-567-8901',
+    orders: 12,
+    totalSpent: 458.90,
+    lastOrder: new Date().toISOString(),
+    loyaltyPoints: 120
+  },
+  {
+    id: 'c2',
+    name: 'Emma Wilson',
+    email: 'emma.w@email.com',
+    phone: '+1 234-567-8902',
+    orders: 8,
+    totalSpent: 325.50,
+    lastOrder: new Date().toISOString(),
+    loyaltyPoints: 80
+  }
+];
 
 interface CustomerState {
   customers: Customer[];
@@ -25,15 +48,16 @@ interface CustomerState {
 }
 
 export const useCustomerStore = create<CustomerState>((set) => ({
-  customers: [],
+  customers: mockCustomers,
   isLoading: false,
   error: null,
 
   fetchCustomers: async () => {
     try {
       set({ isLoading: true });
-      const { data } = await getCustomers();
-      set({ customers: data, isLoading: false });
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      set({ customers: mockCustomers, isLoading: false });
     } catch (error) {
       set({ error: 'Failed to fetch customers', isLoading: false });
       toast.error('Failed to fetch customers');
@@ -43,9 +67,17 @@ export const useCustomerStore = create<CustomerState>((set) => ({
   addCustomer: async (customerData) => {
     try {
       set({ isLoading: true });
-      const { data } = await addCustomer(customerData);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const newCustomer: Customer = {
+        id: `c${Date.now()}`,
+        ...customerData,
+        orders: 0,
+        totalSpent: 0,
+        lastOrder: new Date().toISOString()
+      };
       set((state) => ({
-        customers: [...state.customers, data],
+        customers: [...state.customers, newCustomer],
         isLoading: false
       }));
       toast.success('Customer added successfully');
@@ -58,10 +90,11 @@ export const useCustomerStore = create<CustomerState>((set) => ({
   updateCustomer: async (id, customerData) => {
     try {
       set({ isLoading: true });
-      const { data } = await updateCustomer(id, customerData);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       set((state) => ({
         customers: state.customers.map((customer) =>
-          customer.id === id ? { ...customer, ...data } : customer
+          customer.id === id ? { ...customer, ...customerData } : customer
         ),
         isLoading: false
       }));
@@ -75,7 +108,8 @@ export const useCustomerStore = create<CustomerState>((set) => ({
   deleteCustomer: async (id) => {
     try {
       set({ isLoading: true });
-      await deleteCustomer(id);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       set((state) => ({
         customers: state.customers.filter((customer) => customer.id !== id),
         isLoading: false

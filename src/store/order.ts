@@ -1,6 +1,4 @@
 import { create } from 'zustand';
-import { createOrder, getOrders, updateOrderStatus } from '../api';
-import { socketService } from '../services/socket';
 import { toast } from 'react-hot-toast';
 
 interface OrderItem {
@@ -20,6 +18,34 @@ export interface Order {
   branchId: string;
 }
 
+// Mock data for demo
+const mockOrders: Order[] = [
+  {
+    id: 'order-1',
+    items: [
+      { productId: 'p1', name: 'Margherita Pizza', quantity: 2, price: 12.99 },
+      { productId: 'p2', name: 'Coca Cola', quantity: 2, price: 2.50 }
+    ],
+    total: 30.98,
+    status: 'pending',
+    tableNumber: '12',
+    createdAt: new Date().toISOString(),
+    branchId: 'branch-1'
+  },
+  {
+    id: 'order-2',
+    items: [
+      { productId: 'p3', name: 'Chicken Burger', quantity: 1, price: 8.99 },
+      { productId: 'p4', name: 'French Fries', quantity: 1, price: 3.99 }
+    ],
+    total: 12.98,
+    status: 'preparing',
+    tableNumber: '15',
+    createdAt: new Date().toISOString(),
+    branchId: 'branch-1'
+  }
+];
+
 interface OrderState {
   orders: Order[];
   activeOrder: Order | null;
@@ -29,7 +55,6 @@ interface OrderState {
   createNewOrder: (orderData: Omit<Order, 'id' | 'createdAt'>) => Promise<void>;
   updateStatus: (orderId: string, status: Order['status']) => Promise<void>;
   setActiveOrder: (order: Order | null) => void;
-  handleRealTimeUpdate: (updatedOrder: Partial<Order>) => void;
 }
 
 export const useOrderStore = create<OrderState>((set, get) => ({
@@ -41,8 +66,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   fetchOrders: async () => {
     try {
       set({ isLoading: true });
-      const { data } = await getOrders();
-      set({ orders: data, isLoading: false });
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      set({ orders: mockOrders, isLoading: false });
     } catch (error) {
       set({ error: 'Failed to fetch orders', isLoading: false });
       toast.error('Failed to fetch orders');
@@ -52,9 +78,15 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   createNewOrder: async (orderData) => {
     try {
       set({ isLoading: true });
-      const { data } = await createOrder(orderData);
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const newOrder: Order = {
+        id: `order-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        ...orderData
+      };
       set((state) => ({
-        orders: [data, ...state.orders],
+        orders: [newOrder, ...state.orders],
         isLoading: false
       }));
       toast.success('Order created successfully');
@@ -67,17 +99,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   updateStatus: async (orderId, status) => {
     try {
       set({ isLoading: true });
-      await updateOrderStatus(orderId, status);
-      
-      const order = get().orders.find(o => o.id === orderId);
-      if (order) {
-        socketService.updateOrderStatus({
-          orderId,
-          status,
-          branchId: order.branchId
-        });
-      }
-
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
       set((state) => ({
         orders: state.orders.map((order) =>
           order.id === orderId ? { ...order, status } : order
@@ -91,13 +114,5 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     }
   },
 
-  setActiveOrder: (order) => set({ activeOrder: order }),
-
-  handleRealTimeUpdate: (updatedOrder) => {
-    set((state) => ({
-      orders: state.orders.map((order) =>
-        order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order
-      )
-    }));
-  }
+  setActiveOrder: (order) => set({ activeOrder: order })
 }));
