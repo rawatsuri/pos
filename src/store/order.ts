@@ -3,6 +3,7 @@ import { toast } from 'react-hot-toast';
 import { syncService } from '../services/sync';
 import { localDB } from '../services/db';
 import { networkService } from '../services/network';
+import { billingService } from '../services/billing';
 import api from '../services/api';
 
 export interface OrderItem {
@@ -20,8 +21,15 @@ export interface Order {
   tableNumber: string;
   createdAt: string;
   branchId: string;
-  paymentStatus?: 'pending' | 'completed' | 'failed';
-  paymentMethod?: 'cash' | 'card' | 'upi';
+  customerPhone?: string;
+  paymentStatus: 'pending' | 'processing' | 'completed' | 'failed';
+  paymentMethod: 'cash' | 'online' | 'partial';
+  payments?: {
+    cash?: number;
+    online?: number;
+    timestamp: string;
+  }[];
+  syncStatus?: 'pending' | 'synced' | 'failed';
 }
 
 interface OrderState {
@@ -33,9 +41,45 @@ interface OrderState {
   createNewOrder: (orderData: Omit<Order, 'id' | 'createdAt'>) => Promise<void>;
   updateStatus: (orderId: string, status: Order['status']) => Promise<void>;
   updateOrderInRealtime: (data: Partial<Order> & { orderId: string }) => void;
-  processPayment: (orderId: string, method: Order['paymentMethod']) => Promise<void>;
+  processPayment: (orderId: string, paymentData: {
+    cashAmount: number;
+    onlineAmount: number;
+    customerPhone: string;
+  }) => Promise<void>;
   setActiveOrder: (order: Order | null) => void;
 }
+
+// Demo orders for offline functionality
+const demoOrders: Order[] = [
+  {
+    id: 'order-1',
+    items: [
+      { productId: '1', name: 'Margherita Pizza', quantity: 2, price: 12.99 },
+      { productId: '2', name: 'Coca Cola', quantity: 2, price: 2.50 }
+    ],
+    total: 30.98,
+    status: 'preparing',
+    tableNumber: '12',
+    createdAt: new Date().toISOString(),
+    branchId: 'branch-1',
+    paymentStatus: 'pending',
+    paymentMethod: 'cash'
+  },
+  {
+    id: 'order-2',
+    items: [
+      { productId: '3', name: 'Chicken Burger', quantity: 1, price: 8.99 },
+      { productId: '4', name: 'French Fries', quantity: 1, price: 3.99 }
+    ],
+    total: 12.98,
+    status: 'pending',
+    tableNumber: '15',
+    createdAt: new Date().toISOString(),
+    branchId: 'branch-1',
+    paymentStatus: 'pending',
+    paymentMethod: 'cash'
+  }
+];
 
 export const useOrderStore = create<OrderState>((set, get) => ({
   orders: [],
@@ -64,13 +108,19 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         );
 
         set({ orders: serverOrders });
+      } else {
+        // If offline, use demo data if no local data
+        if (localOrders.length === 0) {
+          set({ orders: demoOrders });
+        }
       }
     } catch (error) {
       console.error('Error fetching orders:', error);
-      // Don't show error toast if we have local data
-      if (get().orders.length === 0) {
-        toast.error('Failed to fetch orders');
-      }
+      // Use demo data if fetch fails
+      set({ 
+        orders: demoOrders,
+        error: 'Failed to fetch orders. Using offline data.'
+      });
     } finally {
       set({ isLoading: false });
     }
@@ -82,7 +132,8 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       const newOrder: Order = {
         ...orderData,
         id: `order-${Date.now()}`,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        syncStatus: 'pending'
       };
 
       // Always save to local first
@@ -93,10 +144,67 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         isLoading: false
       }));
 
+      // If it's an online payment, generate and send bill
+      if (orderData.paymentMethod === 'online' || orderData.paymentMethod === 'partial') {
+        const bill = await billingService.generateBill(newOrder);
+        await billingService.sendBill(bill, {
+          sendTo: {
+            whatsapp: orderData.customerPhone
+          }
+        });
+      }
+
       toast.success('Order created successfully');
     } catch (error) {
       set({ error: 'Failed to create order', isLoading: false });
       toast.error('Failed to create order');
+    }
+  },
+
+  processPayment: async (orderId, { cashAmount, onlineAmount, customerPhone }) => {
+    try {
+      set({ isLoading: true });
+      
+      const order = get().orders.find(o => o.id === orderId);
+      if (!order) throw new Error('Order not found');
+
+      const payment = {
+        cash: cashAmount,
+        online: onlineAmount,
+        timestamp: new Date().toISOString()
+      };
+
+      const updatedOrder = {
+        ...order,
+        payments: [...(order.payments || []), payment],
+        paymentStatus: 'completed',
+        customerPhone
+      };
+
+      // Update local first
+      await syncService.updateItem('orders', orderId, updatedOrder);
+      
+      // Generate and send bill for online portion
+      if (onlineAmount > 0) {
+        const bill = await billingService.generateBill(updatedOrder);
+        await billingService.sendBill(bill, {
+          sendTo: {
+            whatsapp: customerPhone
+          }
+        });
+      }
+
+      set((state) => ({
+        orders: state.orders.map((o) =>
+          o.id === orderId ? updatedOrder : o
+        ),
+        isLoading: false
+      }));
+
+      toast.success('Payment processed successfully');
+    } catch (error) {
+      set({ error: 'Failed to process payment', isLoading: false });
+      toast.error('Failed to process payment');
     }
   },
 
@@ -127,30 +235,6 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         order.id === data.orderId ? { ...order, ...data } : order
       )
     }));
-  },
-
-  processPayment: async (orderId, method) => {
-    try {
-      set({ isLoading: true });
-      
-      // Update local first
-      await syncService.updateItem('orders', orderId, {
-        paymentStatus: 'completed',
-        paymentMethod: method
-      });
-
-      set((state) => ({
-        orders: state.orders.map((order) =>
-          order.id === orderId ? { ...order, paymentStatus: 'completed', paymentMethod: method } : order
-        ),
-        isLoading: false
-      }));
-
-      toast.success('Payment processed successfully');
-    } catch (error) {
-      set({ error: 'Failed to process payment', isLoading: false });
-      toast.error('Failed to process payment');
-    }
   },
 
   setActiveOrder: (order) => set({ activeOrder: order })
