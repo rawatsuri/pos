@@ -1,46 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, AlertTriangle } from 'lucide-react';
-
-interface InventoryItem {
-  id: string;
-  name: string;
-  category: string;
-  stock: number;
-  unit: string;
-  minStock: number;
-  lastUpdated: string;
-}
+import { useInventoryStore } from '../store/inventory';
+import NewProductModal from '../components/NewProductModal';
+import PageHeader from '../components/PageHeader';
+import StatusBadge from '../components/StatusBadge';
 
 const Inventory = () => {
+  const [isNewProductModalOpen, setIsNewProductModalOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const { products, fetchProducts, isLoading } = useInventoryStore();
 
-  const inventory: InventoryItem[] = [
-    { id: 'INV001', name: 'Tomatoes', category: 'Vegetables', stock: 45, unit: 'kg', minStock: 20, lastUpdated: '2h ago' },
-    { id: 'INV002', name: 'Chicken Breast', category: 'Meat', stock: 15, unit: 'kg', minStock: 20, lastUpdated: '1h ago' },
-    { id: 'INV003', name: 'Olive Oil', category: 'Pantry', stock: 25, unit: 'L', minStock: 10, lastUpdated: '1d ago' },
-    { id: 'INV004', name: 'Mozzarella', category: 'Dairy', stock: 30, unit: 'kg', minStock: 15, lastUpdated: '4h ago' },
-  ];
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
 
   const categories = ['All', 'Vegetables', 'Meat', 'Dairy', 'Pantry'];
 
+  const filteredProducts = products.filter((product) => {
+    const matchesCategory = activeCategory === 'all' || product.category.toLowerCase() === activeCategory.toLowerCase();
+    const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         product.category.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const lowStockProducts = products.filter(product => product.stock <= product.minStock);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-800">Inventory Management</h1>
-        <button className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-          <Plus size={20} className="mr-2" />
-          Add Item
-        </button>
-      </div>
+      <PageHeader 
+        title="Inventory Management" 
+        buttonLabel="Add Item"
+        onButtonClick={() => setIsNewProductModalOpen(true)}
+      />
 
-      {/* Search and Filter */}
       <div className="flex gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
           <input
             type="text"
             placeholder="Search inventory..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
         </div>
@@ -50,7 +51,6 @@ const Inventory = () => {
         </button>
       </div>
 
-      {/* Categories */}
       <div className="flex gap-2">
         {categories.map((category) => (
           <button
@@ -67,15 +67,17 @@ const Inventory = () => {
         ))}
       </div>
 
-      {/* Low Stock Alert */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <div className="flex items-center">
-          <AlertTriangle className="text-yellow-500 mr-2" size={20} />
-          <span className="text-yellow-700">3 items are running low on stock</span>
+      {lowStockProducts.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center">
+            <AlertTriangle className="text-yellow-500 mr-2" size={20} />
+            <span className="text-yellow-700">
+              {lowStockProducts.length} items are running low on stock
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Inventory Table */}
       <div className="bg-white rounded-lg shadow-sm">
         <div className="grid grid-cols-7 gap-4 p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
           <div className="font-medium text-gray-500">Item Name</div>
@@ -86,28 +88,36 @@ const Inventory = () => {
           <div className="font-medium text-gray-500">Status</div>
           <div className="font-medium text-gray-500">Last Updated</div>
         </div>
-        {inventory.map((item) => (
-          <div key={item.id} className="grid grid-cols-7 gap-4 p-4 border-b border-gray-100 hover:bg-gray-50">
-            <div className="font-medium">{item.name}</div>
-            <div>{item.category}</div>
-            <div>{item.stock}</div>
-            <div>{item.unit}</div>
-            <div>{item.minStock}</div>
-            <div>
-              <span
-                className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  item.stock <= item.minStock
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-green-100 text-green-800'
-                }`}
-              >
-                {item.stock <= item.minStock ? 'Low Stock' : 'In Stock'}
-              </span>
+        {isLoading ? (
+          <div className="p-8 text-center text-gray-500">Loading inventory...</div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No items found</div>
+        ) : (
+          filteredProducts.map((item) => (
+            <div key={item.id} className="grid grid-cols-7 gap-4 p-4 border-b border-gray-100 hover:bg-gray-50">
+              <div className="font-medium">{item.name}</div>
+              <div>{item.category}</div>
+              <div>{item.stock}</div>
+              <div>{item.unit}</div>
+              <div>{item.minStock}</div>
+              <div>
+                <StatusBadge
+                  status={item.stock <= item.minStock ? 'Low Stock' : 'In Stock'}
+                  variant={item.stock <= item.minStock ? 'error' : 'success'}
+                />
+              </div>
+              <div className="text-gray-500">
+                {new Date(item.updatedAt).toLocaleDateString()}
+              </div>
             </div>
-            <div className="text-gray-500">{item.lastUpdated}</div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
+
+      <NewProductModal
+        isOpen={isNewProductModalOpen}
+        onClose={() => setIsNewProductModalOpen(false)}
+      />
     </div>
   );
 };

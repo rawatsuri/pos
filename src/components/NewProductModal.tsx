@@ -7,13 +7,12 @@ import { useInventoryStore } from '../store/inventory';
 
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
-  description: z.string(),
+  description: z.string().optional(),
   category: z.string().min(1, 'Category is required'),
   price: z.number().min(0, 'Price must be positive'),
   stock: z.number().min(0, 'Stock must be positive'),
   unit: z.string().min(1, 'Unit is required'),
-  minStock: z.number().min(0, 'Minimum stock must be positive'),
-  image: z.string().optional()
+  minStock: z.number().min(0, 'Minimum stock must be positive')
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -36,20 +35,30 @@ const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose }) =>
   });
 
   const onSubmit = async (data: ProductFormData) => {
-    await addProduct(data);
-    reset();
-    onClose();
+    try {
+      await addProduct({
+        ...data,
+        branchId: 'default-branch' // This should come from your branch store
+      });
+      reset();
+      onClose();
+    } catch (error) {
+      console.error('Failed to add product:', error);
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-md w-full">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-semibold">Add New Product</h2>
-            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <button 
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700"
+            >
               <X size={24} />
             </button>
           </div>
@@ -83,10 +92,10 @@ const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose }) =>
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
               >
                 <option value="">Select Category</option>
-                <option value="Appetizers">Appetizers</option>
-                <option value="Main Course">Main Course</option>
-                <option value="Desserts">Desserts</option>
-                <option value="Beverages">Beverages</option>
+                <option value="Vegetables">Vegetables</option>
+                <option value="Meat">Meat</option>
+                <option value="Dairy">Dairy</option>
+                <option value="Pantry">Pantry</option>
               </select>
               {errors.category && (
                 <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>
@@ -147,16 +156,6 @@ const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose }) =>
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700">Image URL</label>
-              <input
-                type="text"
-                {...register('image')}
-                placeholder="https://example.com/image.jpg"
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              />
-            </div>
-
             <div className="flex justify-end gap-4 mt-6">
               <button
                 type="button"
@@ -170,10 +169,10 @@ const NewProductModal: React.FC<NewProductModalProps> = ({ isOpen, onClose }) =>
                 disabled={isLoading}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
               >
-                Add Product
+                {isLoading ? 'Adding...' : 'Add Product'}
               </button>
             </div>
-          </form</form>
+          </form>
         </div>
       </div>
     </div>
